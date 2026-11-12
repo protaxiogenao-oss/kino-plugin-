@@ -1,0 +1,42 @@
+{
+  "id": "18eu",
+  "name": "18eu.net",
+  "version": "1.0.0",
+  "apiVersion": 6,
+  "entry": "plugin.js",
+  "description": "European erotic movies and TV series from 18eu.net. HLS streams, movies and series.",
+  "author": "Hotaru Yume",
+  "creator": "hotaruyume",
+  "homepage": "https://18eu.net",
+  "hosts": [
+    "18eu.net",
+    "*.18eu.net",
+    "master.abyssssss.top",
+    "*.abyssssss.top",
+    "player.abyssssss.top",
+    "player.abyssplayer.com",
+    "*.abyssplayer.com",
+    "image.tmdb.org"
+  ],
+  "streamHosts": "any",
+  "capabilities": [
+    "search",
+    "home",
+    "browse",
+    "episodes",
+    "resolve"
+  ],
+  "categories": [
+    "movies",
+    "series"
+  ],
+  "color": "#E11D48",
+  "icon": "icon.png",
+  "theme": {
+    "accent": "#E11D48",
+    "onAccent": "#FFFFFF",
+    "background": "#0C0A09",
+    "surface": "#1C1917",
+    "highlight": "#FB7185"
+  }
+}
