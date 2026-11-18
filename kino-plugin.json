@@ -1,31 +1,26 @@
 {
   "id": "capibara-traductor",
   "name": "Capibara Traductor",
-  "version": "2.1.0",
-  "apiVersion": 14,
-  "entry": "plugin.js",
-  "description": "Mangas de CapibaraTraductor en español. Catálogo, capítulos ordenados y lector de páginas en pantalla (descifrado ph).",
   "author": "Hotaru Yume",
   "creator": "hotaruyume",
-  "homepage": "https://capibaratraductor.com",
+  "version": "3.0.0",
+  "apiVersion": 14,
+  "entry": "plugin.js",
+  "icon": "icon.png",
   "hosts": [
     "capibaratraductor.com",
     "*.capibaratraductor.com",
     "r2.capibaratraductor.com"
   ],
-  "streamHosts": "any",
   "capabilities": [
-    "search",
-    "home",
-    "browse",
-    "episodes",
-    "resolve",
     "screen",
     "shared"
   ],
-  "categories": ["anime", "series"],
+  "categories": [
+    "manga"
+  ],
+  "description": "Lee mangas de CapibaraTraductor en español: Inicio (destacados/últimos/populares), búsqueda, detalle con capítulos ordenados y lector de páginas (tira o página a página).",
   "color": "#0EA5E9",
-  "icon": "icon.png",
   "theme": {
     "accent": "#0EA5E9",
     "onAccent": "#FFFFFF",
@@ -38,6 +33,9 @@
     "labelEn": "Capibara",
     "iconFile": "icon.png",
     "menuOpens": "screen",
-    "opensFrom": ["menu", "settings"]
+    "opensFrom": [
+      "menu",
+      "settings"
+    ]
   }
 }
