@@ -1,11 +1,11 @@
-// Capibara Traductor — Kino plugin v3.0.0
+// Capibara Traductor — Kino plugin v3.0.1
 // Autor: Hotaru Yume (hotaruyume)
-// Lector de mangas SOLO por pantalla (como Yuri Online / ZonaTM0):
-//   - Sin home/search/episodes/resolve de catálogo de vídeo.
-//   - Inicio con filas Destacados / Últimos / Populares.
-//   - Búsqueda, detalle con capítulos ordenados (1→N) y lector.
-//   - Descifrado ph + header x-organization.
-// Requiere Kino 0.9.74+ (apiVersion 14, capability "screen").
+// Lector de mangas SOLO por pantalla (como Yuri Online).
+// v3.0.1 — arreglo carga Inicio y buscador:
+//   - every siempre activo en la raíz (como Yuri)
+//   - búsqueda: parsea /org/manga/slug; lee q desde ev.value
+//   - AppBar simple (sin barra duplicada)
+//   - open no borra datos ya cargados
 
 const BASE = "https://capibaratraductor.com";
 const MAX_CAPS = 490;
@@ -283,15 +283,25 @@ function isNovelType(t) {
   return s.indexOf("novel") !== -1 || s === "novela" || s === "novela_ligera";
 }
 
+function parseOrgSlugFromUrl(url) {
+  const m = String(url || "").match(/\/([a-z0-9][a-z0-9-]*)\/manga\/([a-z0-9][a-z0-9-]*)/i);
+  if (!m) return null;
+  return { org: m[1], slug: m[2] };
+}
+
 function orgOf(item) {
   if (item.organization && item.organization.slug) return item.organization.slug;
   if (item.scanSlug) return item.scanSlug;
+  const fromUrl = parseOrgSlugFromUrl(item.url || item.mangaUrl || "");
+  if (fromUrl) return fromUrl.org;
   return "";
 }
 function slugOf(item) {
   if (item.manga && item.manga.slug) return item.manga.slug;
   if (item.mangaSlug) return item.mangaSlug;
   if (item.slug) return item.slug;
+  const fromUrl = parseOrgSlugFromUrl(item.url || item.mangaUrl || "");
+  if (fromUrl) return fromUrl.slug;
   return "";
 }
 function posterOf(item) {
@@ -307,7 +317,6 @@ function titleOf(item) {
   return clean(item.title || (item.manga && item.manga.title) || item.name || "Sin título");
 }
 
-// id interno: org|slug
 function workKey(org, slug) {
   return String(org || "") + "|" + String(slug || "");
 }
@@ -343,11 +352,10 @@ function cardFromWork(w) {
     slug: slug,
     title: titleOf(w),
     poster: posterOf(w),
-    scan: (w.organization && w.organization.name) || org,
+    scan: (w.organization && w.organization.name) || w.scanName || org,
   };
 }
 
-// storage helpers
 function getJson(k, fallback) {
   try {
     const v = kino.storage.get(k);
@@ -362,7 +370,6 @@ function setJson(k, val) {
   } catch (_) {}
 }
 
-// capítulos en storage (no hinchar state)
 function chaptersDe(key) {
   const c = getJson("serie:" + key, null);
   return c && Array.isArray(c.chapters) ? c.chapters : [];
@@ -421,7 +428,6 @@ async function loadWorkDetail(org, slug) {
   };
   const key = workKey(meta.org, meta.slug);
   setJson("serie:" + key, { meta: meta, chapters: list, ts: Date.now() });
-  // limpieza simple
   try {
     const ks = kino.storage.keys().filter(function (k) {
       return k.indexOf("serie:") === 0;
@@ -557,9 +563,25 @@ function gridOf(items) {
   };
 }
 
-// ===================== Árboles de pantalla =====================
+// ===================== Árboles =====================
 function homeTree(state) {
   const children = [];
+  if (state.homeError) {
+    children.push({
+      type: "Text",
+      text: state.homeError,
+      color: "error",
+      padding: 16,
+    });
+    children.push({
+      type: "ElevatedButton",
+      key: "retryHome",
+      labelText: "Reintentar",
+      labelTextEn: "Retry",
+      onPressed: "retryHome",
+      margin: 16,
+    });
+  }
   children.push({
     type: "Text",
     text: "Destacados",
@@ -567,7 +589,6 @@ function homeTree(state) {
     padding: { left: 16, top: 12, right: 16 },
   });
   children.push(railOf(state.featured || [], "feat"));
-
   children.push({
     type: "Text",
     text: "Últimos",
@@ -575,7 +596,6 @@ function homeTree(state) {
     padding: { left: 16, top: 16, right: 16 },
   });
   children.push(railOf(state.latest || [], "lat"));
-
   children.push({
     type: "Text",
     text: "Populares",
@@ -584,34 +604,16 @@ function homeTree(state) {
   });
   children.push(railOf(state.popular || [], "pop"));
 
-  if (state.homeError) {
-    children.unshift({
-      type: "Text",
-      text: state.homeError,
-      color: "error",
-      padding: 16,
-    });
-  }
-
   return {
     type: "Scaffold",
-    every: state.homeLoaded ? undefined : { ms: 800, event: "cargarHome" },
+    every: { ms: 1200, event: "cargarHome" },
     appBar: {
-      type: "AppBar",
-      mergeWithKinoBar: true,
-      dense: true,
       title: "Capibara",
-      leading: {
-        type: "IconButton",
-        icon: "close",
-        labelText: "Cerrar",
-        labelTextEn: "Close",
-        onPressed: { close: true },
-      },
       actions: [
         {
           type: "IconButton",
           icon: "search",
+          key: "goSearch",
           labelText: "Buscar",
           labelTextEn: "Search",
           onPressed: { event: "goSearch" },
@@ -639,18 +641,9 @@ function searchTree(state) {
   return {
     type: "Scaffold",
     appBar: {
-      type: "AppBar",
-      mergeWithKinoBar: true,
-      dense: true,
       title: "Buscar manga",
       titleEn: "Search manga",
-      leading: {
-        type: "IconButton",
-        icon: "arrow_back",
-        labelText: "Atrás",
-        labelTextEn: "Back",
-        onPressed: { pop: true },
-      },
+      actions: [],
     },
     body: {
       type: "SingleChildScrollView",
@@ -773,7 +766,6 @@ function detailTree(state) {
       titleEn: "No published chapters.",
     });
   } else {
-    // orden ascendente: Cap. 1 arriba
     for (let i = 0; i < chapters.length; i++) {
       const c = chapters[i];
       items.push({
@@ -791,17 +783,8 @@ function detailTree(state) {
     type: "Scaffold",
     every: d.loading ? { ms: 600, event: "cargarDetalle" } : undefined,
     appBar: {
-      type: "AppBar",
-      mergeWithKinoBar: true,
-      dense: true,
       title: (meta.title || "Manga").slice(0, 40),
-      leading: {
-        type: "IconButton",
-        icon: "arrow_back",
-        labelText: "Atrás",
-        labelTextEn: "Back",
-        onPressed: { pop: true },
-      },
+      actions: [],
     },
     body: { type: "ListView", key: "detailBody", items: items },
   };
@@ -932,17 +915,8 @@ function readerTree(state) {
   return {
     type: "Scaffold",
     appBar: {
-      type: "AppBar",
-      mergeWithKinoBar: true,
-      dense: true,
       title: (r.chTitle || "Capítulo").slice(0, 40),
-      leading: {
-        type: "IconButton",
-        icon: "arrow_back",
-        labelText: "Volver",
-        labelTextEn: "Back",
-        onPressed: { pop: true },
-      },
+      actions: [],
     },
     body: { type: "Column", children: body },
   };
@@ -966,11 +940,6 @@ export async function screen({ state, route }) {
       },
     };
   }
-  // raíz: inicio
-  if ((st.tab || "inicio") === "buscar") {
-    // pestaña buscar embebida: redirigimos a ruta search
-    return searchTree(st);
-  }
   return homeTree(st);
 }
 
@@ -979,11 +948,12 @@ export async function screenEvent(ev) {
   const state = ev.state || {};
   try {
     if (name === "open") {
-      return { state: { tab: "inicio", homeLoaded: false } };
+      if (state.homeLoaded && (state.featured || []).length) return null;
+      return { state: { tab: state.tab || "inicio" } };
     }
 
     if (name === "tab") {
-      const v = (ev.value != null ? ev.value : ev.arg) || "inicio";
+      const v = ev.value != null ? ev.value : ev.arg;
       if (v === "buscar") {
         return { route: { push: "search" }, state: { tab: "buscar" } };
       }
@@ -994,12 +964,28 @@ export async function screenEvent(ev) {
       return { route: { push: "search" } };
     }
 
+    if (name === "retryHome") {
+      return {
+        state: {
+          homeLoaded: false,
+          featured: [],
+          latest: [],
+          popular: [],
+          homeError: null,
+        },
+      };
+    }
+
     if (name === "cargarHome") {
-      if (state.homeLoaded) return null;
+      if (state.homeLoaded && (state.featured || []).length) return null;
       try {
         const featured = await loadFeatured();
         const latest = await loadMangaList("latest", 1);
         const popular = await loadMangaList("popular", 1);
+        kino.log(
+          "home",
+          "ok f=" + featured.length + " l=" + latest.length + " p=" + popular.length
+        );
         return {
           state: {
             featured: featured,
@@ -1010,21 +996,31 @@ export async function screenEvent(ev) {
           },
         };
       } catch (e) {
+        kino.log("home", (e && (e.message || e.code)) || "error");
         return {
           state: {
             homeLoaded: true,
-            homeError: (e && e.userMessage) || (e && e.message) || "Error al cargar",
+            homeError: (e && e.userMessage) || (e && e.message) || "Error al cargar el inicio",
           },
         };
       }
     }
 
     if (name === "doSearch") {
-      const q = String((state.inputs && state.inputs.q) || state.resultsQ || "").trim();
+      const q = String(
+        (ev.value && ev.value.q) ||
+          (state.inputs && state.inputs.q) ||
+          state.resultsQ ||
+          ""
+      ).trim();
       if (!q) return { toast: "Escribe un título" };
       try {
         const results = await loadSearch(q);
-        return { state: { results: results, resultsQ: q } };
+        kino.log("search", q + " → " + results.length);
+        return {
+          state: { results: results, resultsQ: q },
+          toast: results.length ? results.length + " resultados" : "Sin resultados",
+        };
       } catch (e) {
         return {
           toast: (e && e.userMessage) || (e && e.message) || "Error de búsqueda",
@@ -1036,7 +1032,6 @@ export async function screenEvent(ev) {
       const key = String(ev.arg || "");
       const p = parseWorkKey(key);
       if (!p.slug) return { toast: "Obra inválida" };
-      // abrir detalle al instante con esqueleto
       return {
         route: { push: "detail", params: { key: key } },
         state: {
@@ -1072,10 +1067,7 @@ export async function screenEvent(ev) {
       } catch (e) {
         return {
           state: {
-            detail: Object.assign({}, d, {
-              loading: false,
-              chapters: [],
-            }),
+            detail: Object.assign({}, d, { loading: false, chapters: [] }),
           },
           toast: (e && e.userMessage) || (e && e.message) || "No se pudo cargar",
         };
