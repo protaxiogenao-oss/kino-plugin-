@@ -1,11 +1,11 @@
-// Capibara Traductor — Kino plugin v3.0.1
+// Capibara Traductor — Kino plugin v3.0.2
 // Autor: Hotaru Yume (hotaruyume)
 // Lector de mangas SOLO por pantalla (como Yuri Online).
 // v3.0.1 — arreglo carga Inicio y buscador:
 //   - every siempre activo en la raíz (como Yuri)
 //   - búsqueda: parsea /org/manga/slug; lee q desde ev.value
 //   - AppBar simple (sin barra duplicada)
-//   - open no borra datos ya cargados
+//   - open carga el catálogo al instante (every solo como respaldo)
 
 const BASE = "https://capibaratraductor.com";
 const MAX_CAPS = 490;
@@ -508,12 +508,35 @@ function titleCard(it) {
   };
 }
 
-function railOf(items, prefix) {
+function railSkeleton(prefix) {
+  const sk = [];
+  for (let i = 0; i < 6; i++) {
+    sk.push({
+      type: "Card",
+      key: prefix + "sk" + i,
+      flush: true,
+      children: [
+        { type: "Skeleton", shape: "block", width: 120, height: 180 },
+        { type: "Skeleton", shape: "line", padding: 8 },
+      ],
+    });
+  }
+  return {
+    type: "SingleChildScrollView",
+    key: prefix + "skrail",
+    direction: "horizontal",
+    padding: 12,
+    children: [{ type: "Row", gap: 8, children: sk }],
+  };
+}
+
+function railOf(items, prefix, loading) {
   if (!items || !items.length) {
+    if (loading) return railSkeleton(prefix);
     return {
       type: "Text",
-      text: "Cargando…",
-      textEn: "Loading…",
+      text: "Nada por aquí.",
+      textEn: "Nothing here.",
       color: "muted",
       padding: 16,
     };
@@ -588,21 +611,32 @@ function homeTree(state) {
     style: "h3",
     padding: { left: 16, top: 12, right: 16 },
   });
-  children.push(railOf(state.featured || [], "feat"));
+  const loading = !(state.homeLoaded);
+  children.push(railOf(state.featured || [], "feat", loading));
   children.push({
     type: "Text",
     text: "Últimos",
     style: "h3",
     padding: { left: 16, top: 16, right: 16 },
   });
-  children.push(railOf(state.latest || [], "lat"));
+  children.push(railOf(state.latest || [], "lat", loading));
   children.push({
     type: "Text",
     text: "Populares",
     style: "h3",
     padding: { left: 16, top: 16, right: 16 },
   });
-  children.push(railOf(state.popular || [], "pop"));
+  children.push(railOf(state.popular || [], "pop", loading));
+  if (state.homeLoaded && !(state.featured || []).length && !state.homeError) {
+    children.push({
+      type: "ElevatedButton",
+      key: "retryHome2",
+      labelText: "Recargar catálogo",
+      labelTextEn: "Reload catalog",
+      onPressed: "retryHome",
+      margin: 16,
+    });
+  }
 
   return {
     type: "Scaffold",
@@ -948,8 +982,41 @@ export async function screenEvent(ev) {
   const state = ev.state || {};
   try {
     if (name === "open") {
-      if (state.homeLoaded && (state.featured || []).length) return null;
-      return { state: { tab: state.tab || "inicio" } };
+      // Carga inmediata al abrir (no depender solo del every)
+      if (state.homeLoaded && (state.featured || []).length) {
+        return { state: { tab: state.tab || "inicio" } };
+      }
+      try {
+        const featured = await loadFeatured();
+        const latest = await loadMangaList("latest", 1);
+        const popular = await loadMangaList("popular", 1);
+        kino.log(
+          "open-home",
+          "f=" + featured.length + " l=" + latest.length + " p=" + popular.length
+        );
+        return {
+          state: {
+            tab: state.tab || "inicio",
+            featured: featured,
+            latest: latest,
+            popular: popular,
+            homeLoaded: true,
+            homeError: null,
+          },
+        };
+      } catch (e) {
+        kino.log("open-home", (e && (e.message || e.code)) || "error");
+        return {
+          state: {
+            tab: state.tab || "inicio",
+            homeLoaded: true,
+            homeError:
+              (e && e.userMessage) ||
+              (e && e.message) ||
+              "Error al cargar. ¿Aprobaste el host capibaratraductor.com?",
+          },
+        };
+      }
     }
 
     if (name === "tab") {

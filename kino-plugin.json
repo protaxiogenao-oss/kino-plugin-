@@ -3,7 +3,7 @@
   "name": "Capibara Traductor",
   "author": "Hotaru Yume",
   "creator": "hotaruyume",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "apiVersion": 14,
   "entry": "plugin.js",
   "icon": "icon.png",
@@ -19,7 +19,7 @@
   "categories": [
     "manga"
   ],
-  "description": "Lee mangas de CapibaraTraductor: Inicio (destacados/últimos/populares), búsqueda, capítulos ordenados y lector de páginas.",
+  "description": "Lee mangas de CapibaraTraductor: Inicio, búsqueda, capítulos ordenados y lector. v3.0.2 carga el catálogo al abrir la pantalla.",
   "color": "#0EA5E9",
   "theme": {
     "accent": "#0EA5E9",
@@ -33,6 +33,9 @@
     "labelEn": "Capibara",
     "iconFile": "icon.png",
     "menuOpens": "screen",
-    "opensFrom": ["menu", "settings"]
+    "opensFrom": [
+      "menu",
+      "settings"
+    ]
   }
 }
